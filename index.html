@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>TMG Encoder (Custom Pass)</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 40px; background: #f4f7f6; }
+        .card { background: white; padding: 30px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input, button { margin: 10px; padding: 12px; border-radius: 6px; border: 1px solid #ccc; width: 80%; }
+        button { cursor: pointer; background: #6200ee; color: white; border: none; font-weight: bold; width: 90%; }
+        button:disabled { background: #bbb; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>TMG Encoder</h1>
+        <input type="file" id="upload" accept="image/*"><br>
+        <!-- 自分でパスワードを入力する欄を追加 -->
+        <input type="text" id="customPass" placeholder="設定するパスワード（6文字以上推奨）"><br>
+        <button id="convert" disabled>TMGに変換してダウンロード</button>
+    </div>
+
+    <script>
+        const upload = document.getElementById('upload');
+        const btn = document.getElementById('convert');
+        const customPass = document.getElementById('customPass');
+        let imgObj = null;
+
+        upload.onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.onload = () => { imgObj = img; btn.disabled = false; };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(e.target.files);
+        };
+
+        btn.onclick = () => {
+            const pass = customPass.value;
+            if (pass.length < 1) return alert("パスワードを入力してください");
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const MAX = 500;
+            let scale = Math.min(1, MAX / Math.max(imgObj.width, imgObj.height));
+            canvas.width = imgObj.width * scale;
+            canvas.height = imgObj.height * scale;
+            ctx.drawImage(imgObj, 0, 0, canvas.width, canvas.height);
+
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            let pixels = [];
+
+            for (let i = 0; i < imgData.length; i += 4) {
+                let hex = ((1 << 24) + (imgData[i] << 16) + (imgData[i+1] << 8) + imgData[i+2]).toString(16).slice(1);
+                let bin = parseInt(hex, 16).toString(2).padStart(24, '0');
+                pixels.push(parseInt(bin, 2).toString(8));
+            }
+
+            const tmg = { img: { data: btoa(pixels.join(',')), pass: pass, size: `${canvas.width}x${canvas.height}` } };
+            const blob = new Blob([JSON.stringify(tmg)], {type: "text/plain"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = "secret.tmg";
+            link.click();
+            alert("設定したパスワードで暗号化しました。");
+        };
+    </script>
+</body>
+</html>
